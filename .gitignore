@@ -1,0 +1,18 @@
+# Dados locais — o banco contém dados financeiros, não versionar
+finops.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Configuração local do Claude Code
+.claude/settings.local.json
+
+# SO / editor
+Thumbs.db
+.DS_Store
