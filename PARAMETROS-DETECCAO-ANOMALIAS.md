@@ -137,6 +137,7 @@ início do mês como indicativos, não conclusivos.
 | `min_impact` (diário) | R$ 50/dia | Materialidade do detector diário — desvio menor que isso nunca alerta, por maior que seja o z | Mesma regra de bolso da seção 3: ~0,5–1% do gasto diário total |
 | Piso do sigma | `5% da mediana + R$ 1` | Evita divisão por ~zero em séries estáveis (MAD → 0) | Raramente; subir o piso dessensibiliza séries muito regulares |
 | Recortes dimensionais | `provider`, `provider+empresa`, `provider+centro_custo`, `empresa+projeto` | O detector diário roda nas 4 visões e consolida (`all_dimension_daily`) | Adicionar `provider+servico` quando a coluna serviço estiver bem populada |
+| Detecção de grão mensal | ≥ 80% das séries×mês com valor diário constante | Bases de grão mensal (valor do mês rateado pelos dias, ex.: razão contábil) desativam automaticamente o detector diário — cada virada de mês viraria falso pico. Só a detecção MoM roda | Se uma base mista (parte diária, parte mensal) suprimir picos indevidamente, baixar o limiar de 0,8 em `monthly_grain_share` |
 
 ### Sobre o mesmo evento aparecer em vários recortes
 Um pico em `AWS | CC-1001` aparece também em `AWS` (provider) e `AWS | NSTECH`

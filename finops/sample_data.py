@@ -1,17 +1,23 @@
-"""Gerador de dados de demonstração — 6 meses de custos, orçamento e ROL.
+"""Bases de demonstração.
 
-Inclui anomalias plantadas (picos e derivas) para demonstrar a detecção.
+Demo 1: dados sintéticos (6 meses) com anomalias plantadas para demonstrar a
+detecção. Demo 2: dados reais extraídos de "TD Cloud 2025.xlsx" via
+``tools/etl_td_cloud2025.py`` (CSVs em ``data/demo2/``) — 2025 completo +
+2026 jan-abr, conciliados ao centavo com a planilha de origem.
 """
 
 from __future__ import annotations
 
 from datetime import date, timedelta
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from . import db
 from .ingest import import_custos, import_orcamento, import_receita
+
+DEMO2_DIR = Path(__file__).resolve().parent.parent / "data" / "demo2"
 
 # (provider, empresa, centro_custo, projeto, custo_diario_base)
 _SERIES = [
@@ -87,4 +93,48 @@ def load_demo(today: date | None = None, months: int = 6, seed: int = 42) -> dic
     n_c, _ = import_custos(custos, origem="demo")
     n_o, _ = import_orcamento(orcamento, origem="demo")
     n_r, _ = import_receita(receita, origem="demo")
+    return {"custos": n_c, "orcamento": n_o, "receita": n_r}
+
+
+def _mensal_para_diario(custos_mensais: pd.DataFrame) -> pd.DataFrame:
+    """Distribui o valor mensal uniformemente pelos dias do mês.
+
+    A origem (razão contábil) só tem grão mensal; a distribuição mantém os
+    gráficos diários utilizáveis. O último dia absorve o resíduo de
+    arredondamento, preservando o total mensal ao centavo.
+    """
+    rows = []
+    dims = ["provider", "empresa", "centro_custo", "projeto", "servico"]
+    for r in custos_mensais.itertuples(index=False):
+        periodo = pd.Period(r.competencia)
+        dias = periodo.days_in_month
+        por_dia = round(r.valor / dias, 2)
+        ultimo = round(r.valor - por_dia * (dias - 1), 2)
+        base = {d: getattr(r, d) for d in dims}
+        for dia in range(1, dias + 1):
+            rows.append({
+                "data": f"{r.competencia}-{dia:02d}",
+                **base,
+                "valor": por_dia if dia < dias else ultimo,
+            })
+    return pd.DataFrame(rows)
+
+
+def demo2_available() -> bool:
+    return all((DEMO2_DIR / f).exists() for f in
+               ("custos.csv", "orcamento.csv", "receita.csv"))
+
+
+def load_demo2() -> dict:
+    """Limpa a base e carrega a base demo 2 (TD Cloud 2025/26 — dados reais)."""
+    custos_m = pd.read_csv(DEMO2_DIR / "custos.csv")
+    orcamento = pd.read_csv(DEMO2_DIR / "orcamento.csv")
+    receita = pd.read_csv(DEMO2_DIR / "receita.csv")
+
+    custos = _mensal_para_diario(custos_m)
+
+    db.clear_all()
+    n_c, _ = import_custos(custos, origem="demo2")
+    n_o, _ = import_orcamento(orcamento, origem="demo2")
+    n_r, _ = import_receita(receita, origem="demo2")
     return {"custos": n_c, "orcamento": n_o, "receita": n_r}

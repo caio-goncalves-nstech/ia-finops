@@ -1,5 +1,6 @@
-# Dados locais — o banco contém dados financeiros, não versionar
+# Dados locais — banco e base demo 2 contêm dados financeiros reais, não versionar
 finops.db
+data/demo2/
 
 # Python
 __pycache__/

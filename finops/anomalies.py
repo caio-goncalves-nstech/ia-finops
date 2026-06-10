@@ -16,6 +16,24 @@ import pandas as pd
 from .ingest import DIM_COLS
 
 
+def monthly_grain_share(custos: pd.DataFrame) -> float:
+    """Fração de séries×mês com custo diário constante (dado mensal rateado).
+
+    Bases que só têm grão mensal (ex.: razão contábil) entram no app com o valor
+    do mês distribuído pelos dias. Nesse caso o detector diário só enxergaria as
+    viradas de mês — falsos picos em massa. Acima de ~0,8, trate como mensal e
+    use apenas a detecção MoM.
+    """
+    if custos.empty:
+        return 0.0
+    df = custos.copy()
+    df["competencia"] = df["data"].dt.strftime("%Y-%m")
+    df["serie"] = df[DIM_COLS].agg(" | ".join, axis=1)
+    # <= 2 valores distintos no mês = constante + resíduo de arredondamento
+    g = df.groupby(["serie", "competencia"])["valor"].nunique()
+    return float((g <= 2).mean())
+
+
 def daily_anomalies(custos: pd.DataFrame,
                     dims: list[str] | None = None,
                     window: int = 28,

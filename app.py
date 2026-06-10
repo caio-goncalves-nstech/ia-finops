@@ -16,7 +16,7 @@ import streamlit as st
 from finops import analytics, anomalies, db
 from finops.ingest import (DIM_COLS, ValidationError, import_custos,
                            import_orcamento, import_receita)
-from finops.sample_data import load_demo
+from finops.sample_data import demo2_available, load_demo, load_demo2
 from finops.templates import build_template
 
 st.set_page_config(page_title="FinOps Analytics", page_icon="💰", layout="wide")
@@ -143,10 +143,16 @@ def page_overview(custos, orcamento, receita):
                    "alocado. O restante aparece como 'NÃO ALOCADO' — trate a alocação "
                    "para melhorar a confiabilidade do showback.")
 
-    n_anom = len(anomalies.daily_anomalies(custos))
-    if n_anom:
-        st.error(f"🚨 **{n_anom} anomalia(s) de consumo diário** detectada(s) no período. "
-                 "Veja a página **Anomalias**.")
+    if anomalies.monthly_grain_share(custos) < 0.8:
+        n_anom = len(anomalies.daily_anomalies(custos))
+        if n_anom:
+            st.error(f"🚨 **{n_anom} anomalia(s) de consumo diário** detectada(s) no "
+                     "período. Veja a página **Anomalias**.")
+    else:
+        n_mom = len(anomalies.mom_anomalies(custos))
+        if n_mom:
+            st.error(f"🚨 **{n_mom} variação(ões) mensal(is) atípica(s)** detectada(s) "
+                     "no período. Veja a página **Anomalias**.")
 
     st.divider()
     col_a, col_b = st.columns(2)
@@ -307,9 +313,18 @@ def page_anomalies(custos, *_):
         impacto = c3.number_input("Impacto mínimo MoM (R$)", 0, 100000, 500, 100)
 
     st.subheader("Picos diários (z-score robusto, janela móvel de 28 dias)")
-    daily = anomalies.all_dimension_daily(custos, z_threshold=z)
+    if anomalies.monthly_grain_share(custos) >= 0.8:
+        st.info("📅 Esta base tem **grão mensal** (valor do mês distribuído pelos "
+                "dias) — a análise de picos diários não se aplica e foi desativada. "
+                "Use as **variações mês a mês** abaixo; quando os custos vierem "
+                "com granularidade diária real (ex.: billing dos providers), os "
+                "picos diários voltam automaticamente.")
+        daily = anomalies.daily_anomalies(custos.iloc[0:0])
+    else:
+        daily = anomalies.all_dimension_daily(custos, z_threshold=z)
     if daily.empty:
-        st.success("Nenhum pico diário detectado com os parâmetros atuais. ✅")
+        if anomalies.monthly_grain_share(custos) < 0.8:
+            st.success("Nenhum pico diário detectado com os parâmetros atuais. ✅")
     else:
         st.dataframe(
             daily.assign(data=daily["data"].dt.strftime("%d/%m/%Y"))
@@ -387,13 +402,27 @@ def page_import(*_):
                     st.error(p)
 
     st.subheader("3 · Dados de demonstração")
-    col1, col2 = st.columns(2)
-    if col1.button("🧪 Carregar dados de demonstração (substitui tudo)"):
+    col1, col2, col3 = st.columns(3)
+    if col1.button("🧪 Demo 1 — sintética (substitui tudo)",
+                   help="6 meses de dados fictícios com anomalias plantadas "
+                        "para demonstrar a detecção."):
         res = load_demo()
         st.cache_data.clear()
-        st.success(f"Demo carregada: {res['custos']} custos, {res['orcamento']} orçamento, "
-                   f"{res['receita']} receita (ROL).")
-    if col2.button("🗑️ Limpar toda a base"):
+        st.success(f"Demo 1 carregada: {res['custos']} custos, {res['orcamento']} "
+                   f"orçamento, {res['receita']} receita (ROL).")
+    if demo2_available():
+        if col2.button("🏢 Demo 2 — TD Cloud 2025/26 (substitui tudo)",
+                       help="Dados reais extraídos de 'TD Cloud 2025.xlsx': custos "
+                            "2025 + 2026 jan-abr, orçamentos 2025 e 2026 e ROL 2026. "
+                            "Grão mensal distribuído pelos dias do mês."):
+            res = load_demo2()
+            st.cache_data.clear()
+            st.success(f"Demo 2 carregada: {res['custos']} custos, {res['orcamento']} "
+                       f"orçamento, {res['receita']} receita (ROL).")
+    else:
+        col2.caption("Demo 2 indisponível: gere os CSVs com "
+                     "`python tools/etl_td_cloud2025.py <planilha>`.")
+    if col3.button("🗑️ Limpar toda a base"):
         db.clear_all()
         st.cache_data.clear()
         st.success("Base limpa.")

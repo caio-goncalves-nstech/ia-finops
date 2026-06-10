@@ -12,7 +12,19 @@ streamlit run app.py
 ```
 
 O navegador abre em `http://localhost:8501`. Na primeira vez, vá em
-**📥 Importar Dados → Carregar dados de demonstração** para conhecer os dashboards.
+**📥 Importar Dados** e carregue uma das bases de demonstração:
+
+- **Demo 1 — sintética**: 6 meses de dados fictícios com anomalias plantadas
+  (boa para demonstrar a detecção de picos diários).
+- **Demo 2 — TD Cloud 2025/26**: dados reais extraídos de `TD Cloud 2025.xlsx`
+  (custos 2025 completos + 2026 jan-abr por fornecedor/empresa/BU, orçamentos
+  2025 e 2026 e ROL 2026), conciliados ao centavo com a planilha de origem.
+  Para regenerar os CSVs a partir de uma nova versão da planilha:
+  `python tools/etl_td_cloud2025.py "<caminho do xlsx>"`.
+
+> A demo 2 tem grão **mensal** (valor do mês distribuído pelos dias); o app
+> detecta isso e desativa automaticamente o detector de picos diários,
+> mantendo a análise de variações mês a mês.
 
 ## Como alimentar com dados reais
 
